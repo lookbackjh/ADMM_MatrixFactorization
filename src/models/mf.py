@@ -3,10 +3,10 @@ import torch.nn as nn
 
 class MF(nn.Module):
 
-    def __init__(self, args ) -> None:
+    def __init__(self, args ,num_users,num_items) -> None:
         super().__init__()
-        self.num_users = args.num_users
-        self.num_items = args.num_items
+        self.num_users = num_users
+        self.num_items = num_items
         self.latent_dim = args.latent_dim
         self.user_embedding = nn.Embedding(self.num_users, self.latent_dim)
         self.item_embedding = nn.Embedding(self.num_items, self.latent_dim)
@@ -22,6 +22,5 @@ class MF(nn.Module):
         out = torch.sum(user * item, dim=1)
         return out
 
-    def predict(self, *args, **kwargs) -> None:
-        pass
+
 
