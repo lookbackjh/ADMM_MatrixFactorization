@@ -7,6 +7,7 @@ import torch
 import pandas as pd
 # labelencdoer
 from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
 import numpy as np
 
 def distribute_users(data, num_block=10):
@@ -55,11 +56,13 @@ def allocate_memory(num_items,blocks, usersblocks, num_block=10):
 
     return user_embeddings, item_embeddings, global_item_embeddings, dual_variables, user_embeddings_idx
 
+
+
 def get_epsilon(ratings, user_embedding, item_embedding, user, item):
     # this function is responsible for getting the epsilon
     return ratings-np.dot(user_embedding,item_embedding[item,:])
 
-def admm_update(user_embedding, item_embedding, global_item_embeddings, block, users, num_users, num_items, latent_dim, dual_variable,user_labelencoder,item_labelencoder, rho=0.1, max_iter=100):
+def admm_update(user_embedding, item_embedding, global_item_embeddings, block, users, num_users, num_items, latent_dim, dual_variable,user_labelencoder,item_labelencoder, rho=0.01, max_iter=100):
     # this function is responsible for updating the user embeddings and item embeddings for each block using ADMM
     # block will be the whole datasets of each block
     for i in range(len(block)):
@@ -78,11 +81,14 @@ def admm_update(user_embedding, item_embedding, global_item_embeddings, block, u
         # user=user_labelencoder.transform([user])[0]
         # item=item_labelencoder.transform([item])[0]
         eij=get_epsilon(rating,user_embedding[temp[0],1:],item_embedding,user,item)
+        eij=eij[0]
+        if eij>1000000:
+
+            print("eij is too large")
         user_embedding[temp[0],1:]=user_embedding[temp[0],1:]+args.tau_t*(eij*item_embedding[item,:]-args.lambda_1*user_embedding[temp[0],1:])
 
         # update item embedding
-        item_embedding[item,:]=(args.tau_t/(1+rho*args.tau_t))*((1-args.lambda_2*args.tau_t)/args.tau_t)*item_embedding[item,:]+\
-            eij*user_embedding[temp[0],1:]+rho*global_item_embeddings[item,:]-dual_variable[item,:]
+        item_embedding[item,:]=(args.tau_t/(1+rho*args.tau_t))*(((1-args.lambda_2*args.tau_t)/args.tau_t)*item_embedding[item,:]+eij*user_embedding[temp[0],1:]+rho*global_item_embeddings[item,:]-dual_variable[item,:])
     
     
     pass 
@@ -92,8 +98,8 @@ argparser.add_argument('--latent_dim', type=int, default=10)
 argparser.add_argument('--dropout', type=float, default=0.1)
 argparser.add_argument('--batch_size', type=int, default=500)
 argparser.add_argument('--tau_t', type=int, default=0.01)
-argparser.add_argument('--lambda_1', type=float, default=0.1)
-argparser.add_argument('--lambda_2', type=float, default=0.1)
+argparser.add_argument('--lambda_1', type=float, default=0.001)
+argparser.add_argument('--lambda_2', type=float, default=0.001)
 argparser.add_argument('--max_iter', type=int, default=100)
 args = argparser.parse_args()
 
@@ -106,33 +112,67 @@ item_labelencoder.fit(data['item'].values)
 num_items = data.item.nunique()
 
 
+# train test split data
+train, test = train_test_split(data, test_size=0.2, random_state=42)
+
+
 # we want to distribute the users into num_block blocks and allocate memory for each block 
 # and those two functions are responsible for that
-
-
-blocks,user_blocks=distribute_users(data)
+blocks,user_blocks=distribute_users(train)
 user_embeddings, item_embeddings, global_item_embeddings , dual_variables,user_embeddings_idx= allocate_memory(ml100k.num_items,blocks, user_blocks, num_block=10)
 
 #create labelencoder that transforms user into given index. 
 
 for i in range(args.max_iter):
 
+    global_item_embeddings = np.mean(item_embeddings, axis=0)
     for p in range(len(blocks)):
         block = blocks[p]
         users = user_blocks[p]
         num_users = len(users)
         num_items = block.item.nunique()
         # we want to update the user embeddings and item embeddings for each block
-        admm_update(user_embeddings_idx[p], item_embeddings[p], global_item_embeddings, block, users, num_users, num_items, args.latent_dim, dual_variables[p],user_labelencoder,item_labelencoder,rho=0.1, max_iter=100)
+        admm_update(user_embeddings_idx[p], item_embeddings[p], global_item_embeddings, block, users, num_users, num_items, args.latent_dim, dual_variables[p],user_labelencoder,item_labelencoder,rho=0.01, max_iter=100)
 
     # updatae global item embeddings
-    global_item_embeddings = np.mean(item_embeddings, axis=0)
+    
+      
 
 
     for p in range(len(blocks)):
         # update dual
         dual_variables[p] = dual_variables[p] + args.tau_t*(item_embeddings[p]-global_item_embeddings)
-        
+    
+
+
+    print("iter"+str(i))  
+    # calculate test loss
+    test_x = test[['user', 'item']].values
+    test_y = test['rating'].values
+    test_loss = 0
+
+    
+    # check which block the user is in
+
+
+    for i in range(len(test_x)):
+        user = test_x[i][0]
+        item = test_x[i][1]
+        for idx,arr in enumerate(user_blocks):
+            if user in arr:
+                ub = idx
+                break
+
+        user=user_labelencoder.transform([user])[0]
+        item=item_labelencoder.transform([item])[0]
+        rating = test_y[i]
+        uidx=np.where(user_embeddings_idx[ub][:,0]==user)
+
+
+        eij = rating-np.dot(user_embeddings_idx[ub][uidx[0],1:],global_item_embeddings[item,:])
+        test_loss += eij**2
+    print("test loss: "+str(test_loss/len(test_x)))
+
 
 
 
