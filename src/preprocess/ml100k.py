@@ -8,10 +8,12 @@ from src.preprocess.mldataloader import MlDataLoader
 
 class ML100k():
 
-    def __init__(self) -> None:
+    def __init__(self,args) -> None:
+        self.args=args
+        self.call_data(args)
         pass
 
-    def load_data(self, args) -> None:
+    def call_data(self, args) -> None:
         self.args = args
         data_path="data/ml-100k/u.data"
         self.data= pd.read_csv(data_path, sep='\t', header=None, names=['user', 'item', 'rating', 'timestamp'])
@@ -21,6 +23,9 @@ class ML100k():
 
         # make user and item column as x
         # make user and item column add 1
+
+
+    
         self.data.user = self.data.user -1
         self.data.item = self.data.item -1
         self.x = self.data[['user', 'item']].values
@@ -29,18 +34,35 @@ class ML100k():
 
         # split data into train and test
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.x, self.y, test_size=0.2, random_state=42)
-        self.x_train=torch.LongTensor(self.x_train)
-        self.x_test=torch.LongTensor(self.x_test)
-        self.y_train=torch.FloatTensor(self.y_train)
-        self.y_test=torch.FloatTensor(self.y_test)
         
-        ml100_train = MlDataLoader(self.x_train, self.y_train)
-        ml100_test = MlDataLoader(self.x_test, self.y_test)
-        ml100_train = DataLoader(ml100_train, batch_size=self.args.batch_size, shuffle=True)
-        ml100_test = DataLoader(ml100_test, batch_size=self.args.batch_size, shuffle=False)
+        
+    def load_data(self,args):
+        self.call_data(args)
+        sorted_idx = self.x_train[:, 0].argsort()
+        self.x_train = self.x_train[sorted_idx]
+        self.y_train = self.y_train[sorted_idx]
+        sorted_idx = self.x_test[:, 0].argsort()
+        self.x_test = self.x_test[sorted_idx]
+        self.y_test = self.y_test[sorted_idx]
 
-        return ml100_train, ml100_test
+        return self.x_train, self.y_train, self.x_test, self.y_test
+    
+    def load_torch_data(self):
+        train_dataset = MlDataLoader(self.x_train, self.y_train)
+        test_dataset = MlDataLoader(self.x_test, self.y_test)
 
+        train_loader = DataLoader(train_dataset, batch_size=self.args.batch_size, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=self.args.batch_size, shuffle=False)
+
+        return train_loader, test_loader
+
+
+    def get_dataframe(self):
+        # sort dataframe by user
+        self.data = self.data.sort_values(by=['user'])
+
+
+        return self.data[['user', 'item']]
 
         
 

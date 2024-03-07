@@ -4,9 +4,6 @@ from src.preprocess.ml100k import ML100k
 from src.models.mf import MF
 from src.utils.trainer import Trainer
 import torch
-import os
-os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 argparser = argparse.ArgumentParser()
 argparser.add_argument('--latent_dim', type=int, default=10)

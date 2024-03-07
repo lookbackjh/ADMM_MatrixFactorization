@@ -1,6 +1,7 @@
 
 import torch.nn as nn
 import torch
+import numpy as np
 class ADMM_MF_Block_Trainer():
 
     # to think :일단 작게 만들기? 
@@ -19,9 +20,10 @@ class ADMM_MF_Block_Trainer():
         # for data in self.p_info:
         lambda_1=self.args.lambda_1
         up[user_index,:]=up[user_index,:]+self.tau_t*(self.get_epsilon(ratings,up,vp,user_index,_item_index)-self.args.lambda_1*up[user_index,:])
+        vp[_item_index,:]=vp[_item_index,:]+self.tau_t*(self.get_epsilon(ratings,up,vp,user_index,_item_index)-self.args.lambda_1*vp[_item_index,:])
 
         pass
 
     def get_epsilon(self,ratings,up,vp,user_index,_item_index):
-        to_return=ratings[user_index,_item_index]-torch.mul(up[user_index,:],vp[_item_index,:]) # np로 바꿔야함
+        to_return=ratings[user_index,_item_index]-np.multiply(up[user_index,:],vp[_item_index,:]) # np로 바꿔야함
         return to_return
