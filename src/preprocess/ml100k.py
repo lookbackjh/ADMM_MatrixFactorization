@@ -62,7 +62,7 @@ class ML100k():
         self.data = self.data.sort_values(by=['user'])
 
 
-        return self.data[['user', 'item']]
+        return self.data[['user', 'item','rating']]
 
         
 
