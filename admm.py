@@ -4,6 +4,7 @@ from src.preprocess.ml100k import ML100k
 from src.models.mf import MF
 from src.utils.trainer import Trainer
 import torch
+import pandas as pd
 # labelencdoer
 from sklearn.preprocessing import LabelEncoder
 import numpy as np
@@ -30,26 +31,33 @@ def allocate_memory(num_items,blocks, usersblocks, num_block=10):
     # for implementation i will use numpy instead of pytorch for simplicity
 
     user_embeddings = []
+    user_embeddings_idx = []
     item_embeddings = []
     dual_variables = []
     for i in range(num_block):
         block = blocks[i]
         users = usersblocks[i]
         num_users = len(users)
-        num_items = block.item.nunique()
+        unique_users=np.unique(block.user)
+        #num_items = block.item.nunique()
         user_embeddings.append(np.random.rand(num_users, args.latent_dim))
         item_embeddings.append(np.random.rand(num_items, args.latent_dim))
         dual_variables.append(np.zeros((num_items, args.latent_dim)))
+
+        # want to make user_embeddings with frist column as user index
+        user_embedding_idx=np.random.rand(num_users, args.latent_dim+1)
+        user_embedding_idx[:,0] = unique_users 
+        user_embeddings_idx.append(user_embedding_idx)
 
     # I also want global  item embeddings that needs to be updated every ADMM iteration
     global_item_embeddings = np.random.rand(num_items, args.latent_dim)
     
 
-    return user_embeddings, item_embeddings, global_item_embeddings, dual_variables
+    return user_embeddings, item_embeddings, global_item_embeddings, dual_variables, user_embeddings_idx
 
 def get_epsilon(ratings, user_embedding, item_embedding, user, item):
     # this function is responsible for getting the epsilon
-    return ratings-np.dot(user_embedding[user,:],item_embedding[item,:])
+    return ratings-np.dot(user_embedding,item_embedding[item,:])
 
 def admm_update(user_embedding, item_embedding, global_item_embeddings, block, users, num_users, num_items, latent_dim, dual_variable,user_labelencoder,item_labelencoder, rho=0.1, max_iter=100):
     # this function is responsible for updating the user embeddings and item embeddings for each block using ADMM
@@ -60,16 +68,21 @@ def admm_update(user_embedding, item_embedding, global_item_embeddings, block, u
         rating = block.iloc[i]['rating']
         user=user_labelencoder.transform([user])[0]
         item=item_labelencoder.transform([item])[0]
+
+        # want user embedding row where first column is user index
+        temp=np.where(user_embedding[:,0]==user)
+        uembedding=user_embedding[temp[0],1:]
+
         #dual_variable = np.random.rand(num_items,args.latent_dim)
         # update user embedding
         # user=user_labelencoder.transform([user])[0]
         # item=item_labelencoder.transform([item])[0]
-        eij=get_epsilon(rating,user_embedding,item_embedding,user,item)
-        user_embedding[user,:]=user_embedding[user,:]+args.tau_t*(eij*item_embedding[item,:]-args.lambda_1*user_embedding[user,:])
+        eij=get_epsilon(rating,user_embedding[temp[0],1:],item_embedding,user,item)
+        user_embedding[temp[0],1:]=user_embedding[temp[0],1:]+args.tau_t*(eij*item_embedding[item,:]-args.lambda_1*user_embedding[temp[0],1:])
 
         # update item embedding
         item_embedding[item,:]=(args.tau_t/(1+rho*args.tau_t))*((1-args.lambda_2*args.tau_t)/args.tau_t)*item_embedding[item,:]+\
-            eij*user_embedding[user,:]+rho*global_item_embeddings[item,:]-dual_variable[item,:]
+            eij*user_embedding[temp[0],1:]+rho*global_item_embeddings[item,:]-dual_variable[item,:]
     
     
     pass 
@@ -87,9 +100,10 @@ args = argparser.parse_args()
 ml100k = ML100k(args)
 data=ml100k.get_dataframe()
 user_labelencoder = LabelEncoder()
-user_labelencoder.fit_transform(data['user'].values)
+user_labelencoder.fit(data['user'].values)
 item_labelencoder = LabelEncoder()
-item_labelencoder.fit_transform(data['item'].values)
+item_labelencoder.fit(data['item'].values)
+num_items = data.item.nunique()
 
 
 # we want to distribute the users into num_block blocks and allocate memory for each block 
@@ -97,7 +111,7 @@ item_labelencoder.fit_transform(data['item'].values)
 
 
 blocks,user_blocks=distribute_users(data)
-user_embeddings, item_embeddings, global_item_embeddings , dual_variables= allocate_memory(ml100k.num_items,blocks, user_blocks, num_block=10)
+user_embeddings, item_embeddings, global_item_embeddings , dual_variables,user_embeddings_idx= allocate_memory(ml100k.num_items,blocks, user_blocks, num_block=10)
 
 #create labelencoder that transforms user into given index. 
 
@@ -109,7 +123,7 @@ for i in range(args.max_iter):
         num_users = len(users)
         num_items = block.item.nunique()
         # we want to update the user embeddings and item embeddings for each block
-        admm_update(user_embeddings[p], item_embeddings[p], global_item_embeddings, block, users, num_users, num_items, args.latent_dim, dual_variables[p],user_labelencoder,item_labelencoder,rho=0.1, max_iter=100)
+        admm_update(user_embeddings_idx[p], item_embeddings[p], global_item_embeddings, block, users, num_users, num_items, args.latent_dim, dual_variables[p],user_labelencoder,item_labelencoder,rho=0.1, max_iter=100)
 
     # updatae global item embeddings
     global_item_embeddings = np.mean(item_embeddings, axis=0)
