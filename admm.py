@@ -97,10 +97,12 @@ argparser = argparse.ArgumentParser()
 argparser.add_argument('--latent_dim', type=int, default=10)
 argparser.add_argument('--dropout', type=float, default=0.1)
 argparser.add_argument('--batch_size', type=int, default=500)
-argparser.add_argument('--tau_t', type=int, default=0.01)
-argparser.add_argument('--lambda_1', type=float, default=0.001)
-argparser.add_argument('--lambda_2', type=float, default=0.001)
+argparser.add_argument('--tau_t', type=int, default=0.1)
+argparser.add_argument('--lambda_1', type=float, default=0.05)
+argparser.add_argument('--lambda_2', type=float, default=0.05)
 argparser.add_argument('--max_iter', type=int, default=100)
+argparser.add_argument('--alpha', type=float, default=0.002)
+argparser.add_argument('--beta', type=float, default=0.7)
 args = argparser.parse_args()
 
 ml100k = ML100k(args)
@@ -145,7 +147,7 @@ for i in range(args.max_iter):
     
 
 
-    print("iter"+str(i))  
+     
     # calculate test loss
     test_x = test[['user', 'item']].values
     test_y = test['rating'].values
@@ -155,9 +157,9 @@ for i in range(args.max_iter):
     # check which block the user is in
 
 
-    for i in range(len(test_x)):
-        user = test_x[i][0]
-        item = test_x[i][1]
+    for j in range(len(test_x)):
+        user = test_x[j][0]
+        item = test_x[j][1]
         for idx,arr in enumerate(user_blocks):
             if user in arr:
                 ub = idx
@@ -165,14 +167,23 @@ for i in range(args.max_iter):
 
         user=user_labelencoder.transform([user])[0]
         item=item_labelencoder.transform([item])[0]
-        rating = test_y[i]
+        rating = test_y[j]
         uidx=np.where(user_embeddings_idx[ub][:,0]==user)
 
 
         eij = rating-np.dot(user_embeddings_idx[ub][uidx[0],1:],global_item_embeddings[item,:])
         test_loss += eij**2
+    
+    
+    print("iter"+str(i)) 
+
     print("test loss: "+str(test_loss/len(test_x)))
 
+    # update tau
+    if args.tau_t<args.alpha:
+        args.tau_t = args.alpha
+        continue
+    args.tau_t = args.beta*args.tau_t
 
 
 
