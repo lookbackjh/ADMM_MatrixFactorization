@@ -4,4 +4,6 @@ this repository is responsible for implementing [Stochastic Distributed MAtrix F
 
 run `admm.py` to test the admm version of matrix factorization and run `main.py` to test the original matrix factorization
 
-detailed implementaion are to be updated soon....
+This implementation is naive and basic, so detailed functions have not been implemented yet, and the code may be a bit messy.
+
+Detailed implementations and code cleanup things  are planned to be updated soon...
