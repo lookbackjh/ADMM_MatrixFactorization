@@ -1,8 +1,7 @@
 ## Todo
 
-1. Implement ADMM based MAtrix Factorization
+this repository is responsible for implementing [Stochastic Distributed MAtrix Factorization with ADMM](https://cs.nju.edu.cn/lwj/paper/CIKM14_DSADMM.pdf)
 
-2. Implement ADMM Based Factorization Machines.  
+run `admm.py` to test the admm version of matrix factorization and run `main.py` to test the original matrix factorization
 
-3. create customized ADMM based optimizer. .
-
+detailed implementaion are to be updated soon....
