@@ -11,15 +11,15 @@ argparser.add_argument('--dropout', type=float, default=0.1)
 argparser.add_argument('--batch_size', type=int, default=500)
 args = argparser.parse_args()
 
-ml100k = ML100k()
-train_data,test_data=ml100k.load_data(args)
+ml100k = ML100k(args)
+train_data,test_data=ml100k.load_torch_data()
 mf_model=MF(args,ml100k.num_users,ml100k.num_items)
 criterion = torch.nn.MSELoss()
-optimizer = torch.optim.Adam(mf_model.parameters(), lr=0.01)
+optimizer = torch.optim.Adam(mf_model.parameters(), lr=0.001)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 mf_model.to(device) # just note that to is in-place operation
 trainer=Trainer(mf_model,optimizer,criterion, device)
-trainer.train(train_data,100)
+trainer.train(train_data, test_data,100)
 
 
 

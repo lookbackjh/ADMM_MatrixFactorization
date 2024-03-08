@@ -8,7 +8,7 @@ class Trainer():
         self.device = device
 
     
-    def train(self, data, epochs):
+    def train(self, data, test_data, epochs):
         for epoch in range(epochs):
             for (x,y) in data:
                 x = x.to(self.device)
@@ -18,7 +18,19 @@ class Trainer():
                 loss = self.criterion(output, y)
                 loss.backward()
                 self.optimizer.step()
-                print(f"Epoch {epoch+1}/{epochs}, Loss: {loss.item()}")
+                # print test loss
+                test_loss = 0
+                with torch.no_grad():
+                    for (x,y) in test_data:
+                        x = x.to(self.device)
+                        y = y.to(self.device)
+                        output = self.model(x)
+                        test_loss += self.criterion(output, y)
+
+                #normalize test loss
+                test_loss /= len(test_data)
+                print(f"Epoch {epoch} train loss: {loss.item()} test loss: {test_loss.item()}")
+
         print("Training finished")
 
     

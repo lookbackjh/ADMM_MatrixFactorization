@@ -48,6 +48,14 @@ class ML100k():
         return self.x_train, self.y_train, self.x_test, self.y_test
     
     def load_torch_data(self):
+
+        # convert x to integer, y to floattenser
+        self.x_train = torch.tensor(self.x_train, dtype=torch.long)
+        self.y_train = torch.tensor(self.y_train, dtype=torch.float)
+        self.x_test = torch.tensor(self.x_test, dtype=torch.long)
+        self.y_test = torch.tensor(self.y_test, dtype=torch.float)
+        
+
         train_dataset = MlDataLoader(self.x_train, self.y_train)
         test_dataset = MlDataLoader(self.x_test, self.y_test)
 
